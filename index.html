@@ -4,7 +4,71 @@
   <meta charset="UTF-8">
   <title>SGS Luggage Scanner</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script type="module">
+    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/+esm';
+
+    const apiUrl = "https://script.google.com/macros/s/AKfycby9KJbi-0ofT53XZsAOCVAZ3sV8j4hAER6ktUx3J364Kd7gk8BMsHkGbv_qlU1J7PtE/exec";
+    const codeReader = new BrowserMultiFormatReader();
+    let currentDeviceId = null;
+
+    function startScanner(deviceId) {
+      codeReader.decodeFromVideoDevice(deviceId, 'reader', (result, err, controls) => {
+        if (result) {
+          handleScan(result.getText());
+        }
+      }).catch(err => {
+        document.getElementById("result").textContent = "Camera error: " + err;
+      });
+    }
+
+    function switchCamera(mode) {
+      codeReader.listVideoInputDevices().then(videoInputDevices => {
+        const backCam = videoInputDevices.find(d => d.label.toLowerCase().includes("back")) || videoInputDevices[0];
+        const frontCam = videoInputDevices.find(d => d.label.toLowerCase().includes("front")) || videoInputDevices[0];
+        currentDeviceId = (mode === 'environment') ? backCam.deviceId : frontCam.deviceId;
+        codeReader.reset();
+        startScanner(currentDeviceId);
+      });
+    }
+
+    function uploadImage() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        codeReader.decodeFromImage(file).then(result => {
+          handleScan(result.getText());
+        }).catch(() => document.getElementById("result").textContent = "Failed to decode image.");
+      };
+      input.click();
+    }
+
+    function handleScan(decodedText) {
+      document.getElementById("result").textContent = "Fetching data...";
+      fetch(`${apiUrl}?code=${encodeURIComponent(decodedText)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            document.getElementById("result").textContent = data.error;
+          } else {
+            document.getElementById("result").textContent =
+              `Destination: ${data.destination}\nOwner: ${data.owner}\nArrival: ${data.arrival}`;
+          }
+        })
+        .catch(() => {
+          document.getElementById("result").textContent = "Error contacting server.";
+        });
+    }
+
+    window.onload = () => {
+      switchCamera('environment');
+    }
+
+    window.switchCamera = switchCamera;
+    window.uploadImage = uploadImage;
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
     body {
@@ -33,6 +97,7 @@
       border: 1px solid #26a69a;
       width: 90%;
       text-align: center;
+      white-space: pre-wrap;
     }
     .btn {
       margin: 5px;
@@ -66,68 +131,5 @@
   <footer style="margin-top: auto; padding: 20px; font-size: 14px; color: #666;">
     © 2025 Saudi Ground Services Academy
   </footer>
-
-  <script>
-    const apiUrl = "https://script.google.com/macros/s/AKfycby9KJbi-0ofT53XZsAOCVAZ3sV8j4hAER6ktUx3J364Kd7gk8BMsHkGbv_qlU1J7PtE/exec";
-    let html5QrCode;
-    let currentFacingMode = 'environment';
-
-    function switchCamera(mode) {
-      if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-          html5QrCode.clear().then(() => startCamera(mode));
-        });
-      } else {
-        startCamera(mode);
-      }
-    }
-
-    function startCamera(mode) {
-      html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start(
-        { facingMode: mode },
-        { fps: 10, qrbox: 250 },
-        (decodedText) => handleScan(decodedText),
-        () => {}
-      ).catch(err => {
-        document.getElementById("result").textContent = "Camera error: " + err;
-      });
-    }
-
-    function uploadImage() {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        html5QrCode.scanFile(file, true)
-          .then(decodedText => handleScan(decodedText))
-          .catch(() => document.getElementById("result").textContent = "Failed to decode image.");
-      };
-      input.click();
-    }
-
-    function handleScan(decodedText) {
-      document.getElementById("result").textContent = "Fetching data...";
-      fetch(`${apiUrl}?code=${encodeURIComponent(decodedText)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) {
-            document.getElementById("result").textContent = data.error;
-          } else {
-            document.getElementById("result").textContent =
-              `Destination: ${data.destination}\nOwner: ${data.owner}\nArrival: ${data.arrival}`;
-          }
-        })
-        .catch(() => {
-          document.getElementById("result").textContent = "Error contacting server.";
-        });
-    }
-
-    window.onload = () => {
-      switchCamera('environment');
-    }
-  </script>
 </body>
 </html>
