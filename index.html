@@ -7,190 +7,91 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg-color: #ffffff;
-      --text-color: #1c1c1c;
-      --header-bg: #f6f8fa;
-      --scanner-bg: #fff;
-      --result-bg: #e0f2f1;
-      --result-border: #26a69a;
-      --button-bg: #007f5f;
-      --button-text: #ffffff;
-    }
-
-    body.dark {
-      --bg-color: #1e1e1e;
-      --text-color: #e0e0e0;
-      --header-bg: #2c2c2c;
-      --scanner-bg: #333;
-      --result-bg: #004d40;
-      --result-border: #26a69a;
-      --button-bg: #26a69a;
-      --button-text: #fff;
-    }
-
     body {
       margin: 0;
       font-family: 'Inter', sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-color);
       display: flex;
       flex-direction: column;
       align-items: center;
+      background: #f4f4f4;
       min-height: 100vh;
       padding: 20px;
-      transition: background-color 0.3s ease, color 0.3s ease;
     }
-
     header {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 10px 20px;
-      background-color: var(--header-bg);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      flex-direction: column;
-      gap: 5px;
-    }
-
-    header img {
-      height: 50px;
-    }
-
-    header h1 {
-      font-size: 20px;
-      color: var(--text-color);
-      margin: 0;
       text-align: center;
+      margin-bottom: 20px;
     }
-
     #reader {
       width: 320px;
-      border-radius: 12px;
-      background-color: var(--scanner-bg);
-      padding: 15px;
-      box-shadow: 0 0 12px rgba(0,0,0,0.08);
-      margin-top: 30px;
+      margin: 0 auto;
     }
-
     #result {
       margin-top: 20px;
-      font-size: 18px;
-      color: var(--button-bg);
-      padding: 12px 20px;
-      background-color: var(--result-bg);
-      border: 1px solid var(--result-border);
+      background: #e0f7fa;
+      padding: 15px;
       border-radius: 8px;
-      min-height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      white-space: pre-wrap;
-    }
-
-    footer {
-      margin-top: auto;
-      padding: 20px;
-      font-size: 14px;
-      color: #888;
+      border: 1px solid #26a69a;
+      width: 90%;
       text-align: center;
     }
-
-    .controls {
-      margin-top: 30px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
     .btn {
-      padding: 10px 18px;
+      margin: 5px;
+      padding: 10px 20px;
+      background-color: #00796b;
+      color: white;
       border: none;
-      border-radius: 6px;
-      background-color: var(--button-bg);
-      color: var(--button-text);
-      font-weight: 600;
+      border-radius: 5px;
       cursor: pointer;
-      transition: background 0.3s;
-      font-family: 'Inter', sans-serif;
     }
-
     .btn:hover {
-      background-color: #005f47;
-    }
-
-    @media (max-width: 400px) {
-      #reader {
-        width: 95%;
-      }
-
-      header h1 {
-        font-size: 16px;
-        text-align: center;
-      }
+      background-color: #004d40;
     }
   </style>
 </head>
 <body>
-
   <header>
-    <img src="sgs.png" alt="SGS Logo">
-    <h1 id="main-title">Luggage Code Scanner</h1>
+    <img src="sgs.png" alt="SGS Logo" height="60">
+    <h1>Luggage Code Scanner</h1>
   </header>
 
-  <div class="controls">
+  <div>
     <button class="btn" onclick="switchCamera('environment')">Back Camera</button>
     <button class="btn" onclick="switchCamera('user')">Front Camera</button>
     <button class="btn" onclick="uploadImage()">Upload Image</button>
-    <button class="btn" onclick="toggleLanguage()">🇸🇦 Toggle Language</button>
-    <button class="btn" onclick="toggleDarkMode()">🌙 Toggle Mode</button>
   </div>
 
   <div id="reader"></div>
-
   <div id="result">Waiting for scan...</div>
 
-  <footer>© 2025 Saudi Ground Services Academy</footer>
+  <footer style="margin-top: auto; padding: 20px; font-size: 14px; color: #666;">
+    © 2025 Saudi Ground Services Academy
+  </footer>
 
   <script>
     const apiUrl = "https://script.google.com/macros/s/AKfycby9KJbi-0ofT53XZsAOCVAZ3sV8j4hAER6ktUx3J364Kd7gk8BMsHkGbv_qlU1J7PtE/exec";
-
     let html5QrCode;
     let currentFacingMode = 'environment';
-    let isArabic = false;
 
-    async function switchCamera(mode) {
-      try {
-        if (html5QrCode) {
-          await html5QrCode.stop();
-          await html5QrCode.clear();
-        }
-
-        currentFacingMode = mode;
-        startCamera();
-      } catch (err) {
-        console.error("Camera switch error:", err);
+    function switchCamera(mode) {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear().then(() => startCamera(mode));
+        });
+      } else {
+        startCamera(mode);
       }
     }
 
-    async function startCamera() {
+    function startCamera(mode) {
       html5QrCode = new Html5Qrcode("reader");
-
-      try {
-        await html5QrCode.start(
-          { facingMode: currentFacingMode },
-          { fps: 10, qrbox: 250 },
-          (decodedText) => handleScanSuccess(decodedText),
-          () => {} // silent failure
-        );
-      } catch (error) {
-        document.getElementById("result").textContent = isArabic
-          ? "لا يمكن الوصول إلى الكاميرا"
-          : "Camera not accessible.";
-      }
+      html5QrCode.start(
+        { facingMode: mode },
+        { fps: 10, qrbox: 250 },
+        (decodedText) => handleScan(decodedText),
+        () => {}
+      ).catch(err => {
+        document.getElementById("result").textContent = "Camera error: " + err;
+      });
     }
 
     function uploadImage() {
@@ -200,61 +101,33 @@
       input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        html5QrCode.scanFile(file, true).then(decodedText => {
-          handleScanSuccess(decodedText);
-        }).catch(() => {
-          document.getElementById("result").textContent = isArabic
-            ? "فشل في مسح الصورة"
-            : "Failed to decode image.";
-        });
+        html5QrCode.scanFile(file, true)
+          .then(decodedText => handleScan(decodedText))
+          .catch(() => document.getElementById("result").textContent = "Failed to decode image.");
       };
       input.click();
     }
 
-    function handleScanSuccess(decodedText) {
-      const resultBox = document.getElementById("result");
-      resultBox.textContent = isArabic ? "جارٍ التحقق..." : "Validating...";
-
+    function handleScan(decodedText) {
+      document.getElementById("result").textContent = "Fetching data...";
       fetch(`${apiUrl}?code=${encodeURIComponent(decodedText)}`)
         .then(res => res.json())
         .then(data => {
           if (data.error) {
-            resultBox.textContent = isArabic
-              ? "الرمز غير موجود"
-              : "Code not found.";
+            document.getElementById("result").textContent = data.error;
           } else {
-            resultBox.textContent = `${isArabic ? "الوجهة" : "Destination"}: ${data.destination}
-${isArabic ? "المالك" : "Owner"}: ${data.owner}
-${isArabic ? "الوصول" : "Arrival"}: ${data.arrival}`;
+            document.getElementById("result").textContent =
+              `Destination: ${data.destination}\nOwner: ${data.owner}\nArrival: ${data.arrival}`;
           }
         })
         .catch(() => {
-          resultBox.textContent = isArabic
-            ? "تعذر الوصول إلى الخادم"
-            : "Error contacting server.";
+          document.getElementById("result").textContent = "Error contacting server.";
         });
-    }
-
-    function toggleLanguage() {
-      isArabic = !isArabic;
-      document.getElementById('main-title').textContent = isArabic
-        ? 'ماسح رمز الأمتعة'
-        : 'Luggage Code Scanner';
-      document.getElementById("result").textContent = isArabic
-        ? 'في انتظار المسح...'
-        : 'Waiting for scan...';
-      document.querySelector('footer').textContent = isArabic
-        ? '© 2025 الأكاديمية السعودية للخدمات الأرضية'
-        : '© 2025 Saudi Ground Services Academy';
-    }
-
-    function toggleDarkMode() {
-      document.body.classList.toggle('dark');
     }
 
     window.onload = () => {
       switchCamera('environment');
-    };
+    }
   </script>
 </body>
 </html>
