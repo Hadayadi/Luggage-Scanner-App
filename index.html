@@ -1,124 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>SGS Luggage Scanner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SGS Luggage Code Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
   <style>
     body {
-      margin: 0;
-      font-family: 'Inter', sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: #f4f4f4;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    header {
+      font-family: Arial, sans-serif;
+      background: #f8f8f8;
       text-align: center;
-      margin-bottom: 20px;
+      padding: 2em;
     }
     #reader {
-      width: 320px;
+      width: 300px;
       margin: 0 auto;
     }
-    #result {
-      margin-top: 20px;
-      background: #e0f7fa;
-      padding: 15px;
-      border-radius: 8px;
-      border: 1px solid #26a69a;
-      width: 90%;
-      text-align: center;
-      white-space: pre-wrap;
+    .button-container {
+      margin-top: 1em;
     }
-    .btn {
-      margin: 5px;
+    button {
       padding: 10px 20px;
+      margin: 0 10px;
       background-color: #00796b;
       color: white;
       border: none;
       border-radius: 5px;
       cursor: pointer;
     }
-    .btn:hover {
-      background-color: #004d40;
+    #resultBox {
+      margin-top: 20px;
+      background: #e0f7fa;
+      padding: 20px;
+      border-radius: 10px;
+      width: 80%;
+      margin-left: auto;
+      margin-right: auto;
     }
   </style>
 </head>
 <body>
-  <header>
-    <img src="sgs.png" alt="SGS Logo" height="60">
-    <h1>Luggage Code Scanner</h1>
-  </header>
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/SGS_Logo.svg/512px-SGS_Logo.svg.png" alt="SGS Logo" width="80">
+  <h1>Luggage Code Scanner</h1>
 
-  <div>
-    <button class="btn" onclick="startCamera('environment')">Back Camera</button>
-    <button class="btn" onclick="startCamera('user')">Front Camera</button>
-    <button class="btn" onclick="uploadImage()">Upload Image</button>
+  <div class="button-container">
+    <button onclick="startScanner('environment')">Back Camera</button>
+    <button onclick="startScanner('user')">Front Camera</button>
   </div>
 
   <div id="reader"></div>
-  <div id="result">Waiting for scan...</div>
-
-  <footer style="margin-top: auto; padding: 20px; font-size: 14px; color: #666;">
-    © 2025 Saudi Ground Services Academy
-  </footer>
+  <div id="resultBox">Waiting for scan...</div>
 
   <script>
-    const apiUrl = "https://script.google.com/macros/s/AKfycby9KJbi-0ofT53XZsAOCVAZ3sV8j4hAER6ktUx3J364Kd7gk8BMsHkGbv_qlU1J7PtE/exec";
     let html5QrCode;
-    const config = { fps: 10, qrbox: 250 };
+    const apiUrl = "https://corsproxy.io/?https://script.google.com/macros/s/AKfycby9KJbi-0ofT53XZsAOCVAZ3sV8j4hAER6ktUx3J364Kd7gk8BMsHkGbv_qIU1J7PtE/exec";
 
-    function handleScan(decodedText) {
-      document.getElementById("result").textContent = "Fetching data...";
-      fetch(`${apiUrl}?code=${encodeURIComponent(decodedText)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) {
-            document.getElementById("result").textContent = data.error;
-          } else {
-            document.getElementById("result").textContent =
-              `Destination: ${data.destination}\nOwner: ${data.owner}\nArrival: ${data.arrival}`;
-          }
-        })
-        .catch(() => {
-          document.getElementById("result").textContent = "Error contacting server.";
-        });
-    }
-
-    function startCamera(facingMode = "environment") {
-      const qrRegion = document.getElementById("reader");
+    function startScanner(facingMode) {
       if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-          html5QrCode.clear();
-          html5QrCode.start({ facingMode: facingMode }, config, handleScan);
-        });
-      } else {
-        html5QrCode = new Html5Qrcode("reader");
-        html5QrCode.start({ facingMode: facingMode }, config, handleScan);
+        html5QrCode.stop().catch(console.error);
       }
-    }
+      html5QrCode = new Html5Qrcode("reader");
+      const config = { fps: 10, qrbox: 250 };
 
-    function uploadImage() {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const qr = new Html5Qrcode("reader");
-        qr.scanFile(file, true)
-          .then(handleScan)
-          .catch(() => document.getElementById("result").textContent = "Failed to decode image.");
-      };
-      input.click();
+      Html5Qrcode.getCameras().then(devices => {
+        let cameraId = devices.find(device => device.label.toLowerCase().includes(facingMode))?.id || devices[0]?.id;
+        if (cameraId) {
+          html5QrCode.start(
+            cameraId,
+            config,
+            qrCodeMessage => {
+              html5QrCode.stop().catch(console.error);
+              document.getElementById("resultBox").innerText = "Processing: " + qrCodeMessage;
+              fetch(`${apiUrl}?code=${encodeURIComponent(qrCodeMessage)}`)
+                .then(response => response.json())
+                .then(data => {
+                  if (data.error) {
+                    document.getElementById("resultBox").innerText = `Error: ${data.error}`;
+                  } else {
+                    document.getElementById("resultBox").innerText = `\nDestination: ${data.destination}\nOwner: ${data.owner}\nArrival: ${data.arrival}\nFrom: ${data.from}\nDeparture: ${data.departure}\nTo: ${data.to}\nNext: ${data.next}\nNeeds: ${data.needs}`;
+                  }
+                })
+                .catch(error => {
+                  console.error("Fetch error:", error);
+                  document.getElementById("resultBox").innerText = "Error contacting server.";
+                });
+            },
+            error => {
+              console.warn(`QR Code no match: ${error}`);
+            }
+          );
+        } else {
+          alert("Camera not found.");
+        }
+      }).catch(console.error);
     }
-
-    window.onload = () => startCamera("environment");
   </script>
+
+  <footer style="margin-top: 50px; font-size: 0.9em; color: gray;">
+    © 2025 Saudi Ground Services Academy
+  </footer>
 </body>
 </html>
