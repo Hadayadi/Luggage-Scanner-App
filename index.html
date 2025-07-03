@@ -5,31 +5,11 @@
   <title>SGS Luggage Scanner</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script type="module">
-    import {
-      BrowserMultiFormatReader,
-      BrowserCodeReader
-    } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.2/+esm';
+    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/+esm';
 
     const apiUrl = "https://script.google.com/macros/s/AKfycby9KJbi-0ofT53XZsAOCVAZ3sV8j4hAER6ktUx3J364Kd7gk8BMsHkGbv_qlU1J7PtE/exec";
     const codeReader = new BrowserMultiFormatReader();
     let currentDeviceId = null;
-
-    async function switchCamera(mode) {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoInputDevices = devices.filter(d => d.kind === 'videoinput');
-
-        const backCam = videoInputDevices.find(d => d.label.toLowerCase().includes("back")) || videoInputDevices[0];
-        const frontCam = videoInputDevices.find(d => d.label.toLowerCase().includes("front")) || videoInputDevices[0];
-
-        currentDeviceId = (mode === 'environment') ? backCam.deviceId : frontCam.deviceId;
-
-        codeReader.reset();
-        startScanner(currentDeviceId);
-      } catch (err) {
-        document.getElementById("result").textContent = "Camera detection error: " + err;
-      }
-    }
 
     function startScanner(deviceId) {
       codeReader.decodeFromVideoDevice(deviceId, 'reader', (result, err, controls) => {
@@ -41,22 +21,38 @@
       });
     }
 
+    async function switchCamera(mode) {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+        if (videoDevices.length === 0) {
+          document.getElementById("result").textContent = "No video input devices found.";
+          return;
+        }
+
+        const selectedDevice = videoDevices.find(d =>
+          d.label.toLowerCase().includes(mode === 'environment' ? 'back' : 'front')
+        ) || videoDevices[0];
+
+        currentDeviceId = selectedDevice.deviceId;
+        codeReader.reset();
+        startScanner(currentDeviceId);
+      } catch (error) {
+        document.getElementById("result").textContent = "Camera error: " + error;
+      }
+    }
+
     function uploadImage() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
-      input.onchange = async (e) => {
+      input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
-        const imageBitmap = await createImageBitmap(file);
-        const result = await codeReader.decodeFromImageBitmap(imageBitmap).catch(() => null);
-
-        if (result) {
+        codeReader.decodeFromImage(file).then(result => {
           handleScan(result.getText());
-        } else {
-          document.getElementById("result").textContent = "Failed to decode image.";
-        }
+        }).catch(() => document.getElementById("result").textContent = "Failed to decode image.");
       };
       input.click();
     }
@@ -85,7 +81,6 @@
     window.switchCamera = switchCamera;
     window.uploadImage = uploadImage;
   </script>
-
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     body {
