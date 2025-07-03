@@ -2,28 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SGS Luggage Scanner</title>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f0f0f0;
+      font-family: Arial, sans-serif;
       text-align: center;
-      padding: 20px;
-    }
-    header img {
-      width: 90px;
-      margin-bottom: 10px;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 0;
     }
     h1 {
-      font-size: 1.8rem;
-      margin-bottom: 20px;
+      margin-top: 0.5em;
+      font-size: 2em;
+      color: #333;
+    }
+    #reader {
+      width: 300px;
+      margin: 1em auto;
     }
     .btn-group button {
-      padding: 10px 16px;
+      padding: 10px 20px;
       margin: 5px;
       font-size: 1rem;
-      background-color: #00695c;
+      background-color: #00796B;
       color: white;
       border: none;
       border-radius: 5px;
@@ -32,38 +34,38 @@
     .btn-group button:hover {
       background-color: #004d40;
     }
-    #reader {
-      width: 100%;
-      max-width: 350px;
-      margin: 20px auto;
-    }
     .result-box {
-      background: #e0f7fa;
-      border: 1px solid #4dd0e1;
+      margin: 20px auto;
       padding: 15px;
-      margin: 15px auto;
-      max-width: 600px;
+      width: 80%;
+      max-width: 400px;
+      background-color: #e0f7fa;
+      border: 1px solid #00acc1;
       border-radius: 8px;
-      font-size: 1rem;
+      color: #333;
     }
     footer {
       margin-top: 40px;
-      color: #333;
-      font-size: 0.85em;
+      font-size: 0.9em;
+      color: #888;
+    }
+    input[type="file"] {
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <header>
-    <img src="https://upload.wikimedia.org/wikipedia/en/b/bd/SGS_Logo.png" alt="SGS Logo">
-    <h1>Luggage Code Scanner</h1>
-  </header>
+  <img src="https://upload.wikimedia.org/wikipedia/en/b/bd/SGS_Logo.png" alt="SGS Logo" style="width: 80px; margin-top: 20px;" />
+  <h1>Luggage Code Scanner</h1>
 
   <div class="btn-group">
     <button onclick="startCamera('back')">Back Camera</button>
     <button onclick="startCamera('front')">Front Camera</button>
     <button onclick="stopScanner()">Stop</button>
-    <button onclick="uploadImage()">Upload Image</button>
+  </div>
+
+  <div>
+    <input type="file" accept="image/*" onchange="uploadImage(event)">
   </div>
 
   <div id="reader"></div>
@@ -74,27 +76,35 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script>
     const html5QrCode = new Html5Qrcode("reader");
-    const appScriptUrl = "https://script.google.com/macros/s/AKfycby9KJbi-0ofT53XZsAOCVAZ3sV8j4hAER6ktUx3J364Kd7gk8BMsHkGbv_qlU1J7PtE/exec";
+    const backendUrl = "https://luggage-scanner-app-1.onrender.com/api/luggage";
     let currentCameraId = null;
 
-    function startCamera(facing) {
+    function startCamera(facingMode) {
       Html5Qrcode.getCameras().then(cameras => {
-        const selected = cameras.find(cam => cam.label.toLowerCase().includes(facing)) || cameras[0];
-        currentCameraId = selected.id;
-        html5QrCode.start(
-          currentCameraId,
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          qrCodeMessage => {
-            document.getElementById("result").innerText = `Scanned: ${qrCodeMessage}`;
-            fetchData(qrCodeMessage);
-            stopScanner();
-          },
-          () => {}
-        ).catch(err => {
-          document.getElementById("result").innerText = "Camera error: " + err;
-        });
+        if (cameras && cameras.length) {
+          const selectedCam = cameras.find(cam => cam.label.toLowerCase().includes(facingMode)) || cameras[0];
+          currentCameraId = selectedCam.id;
+
+          html5QrCode.start(
+            currentCameraId,
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 }
+            },
+            qrCodeMessage => {
+              document.getElementById("result").innerText = `Scanned: ${qrCodeMessage}`;
+              fetchData(qrCodeMessage);
+              stopScanner();
+            },
+            errorMsg => {}
+          ).catch(err => {
+            document.getElementById("result").innerText = "Camera Error: " + err;
+          });
+        } else {
+          document.getElementById("result").innerText = "No cameras found.";
+        }
       }).catch(err => {
-        document.getElementById("result").innerText = "Camera load error: " + err;
+        document.getElementById("result").innerText = "Camera error: " + err;
       });
     }
 
@@ -102,32 +112,14 @@
       if (html5QrCode && currentCameraId) {
         html5QrCode.stop().then(() => {
           document.getElementById("reader").innerHTML = "";
-        }).catch(console.error);
+        }).catch(err => {
+          console.error("Stop error:", err);
+        });
       }
     }
 
-    function uploadImage() {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = e => {
-        const file = e.target.files[0];
-        if (!file) return;
-        html5QrCode.scanFile(file, true)
-          .then(decoded => {
-            document.getElementById("result").innerText = `Scanned: ${decoded}`;
-            fetchData(decoded);
-          })
-          .catch(err => {
-            document.getElementById("result").innerText = "Image scan error: " + err;
-          });
-      };
-      input.click();
-    }
-
     function fetchData(code) {
-      const url = `${appScriptUrl}?code=${encodeURIComponent(code)}`;
-      fetch(url)
+      fetch(`${backendUrl}?code=${code}`)
         .then(res => res.json())
         .then(data => {
           if (data.error) {
@@ -141,13 +133,46 @@
               <strong>Departure:</strong> ${data.departure}<br>
               <strong>To:</strong> ${data.to}<br>
               <strong>Next:</strong> ${data.next}<br>
-              <strong>Needs:</strong> ${data.needs}`;
+              <strong>Needs:</strong> ${data.needs}
+            `;
           }
         })
         .catch(err => {
           document.getElementById("result").innerText = "Error contacting server.";
           console.error(err);
         });
+    }
+
+    function uploadImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function () {
+        const img = new Image();
+        img.onload = function () {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, img.width, img.height);
+          const imageData = canvas.toDataURL("image/png");
+
+          Html5QrcodeScanner.getCameras().then(() => {
+            const qr = new Html5Qrcode("reader");
+            qr.scanFile(file, true)
+              .then(qrCodeMessage => {
+                document.getElementById("result").innerText = `Scanned: ${qrCodeMessage}`;
+                fetchData(qrCodeMessage);
+              })
+              .catch(err => {
+                document.getElementById("result").innerText = "No QR code found in image.";
+              });
+          });
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
     }
   </script>
 </body>
