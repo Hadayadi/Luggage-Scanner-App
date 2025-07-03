@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>SGS Luggage Scanner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script type="module">
     import {
-      BrowserMultiFormatReader
+      BrowserMultiFormatReader,
+      BrowserCodeReader
     } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.2/+esm';
 
     const apiUrl = "https://script.google.com/macros/s/AKfycby9KJbi-0ofT53XZsAOCVAZ3sV8j4hAER6ktUx3J364Kd7gk8BMsHkGbv_qlU1J7PtE/exec";
@@ -44,14 +45,18 @@
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
-      input.onchange = (e) => {
+      input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        codeReader.decodeFromImage(file).then(result => {
+
+        const imageBitmap = await createImageBitmap(file);
+        const result = await codeReader.decodeFromImageBitmap(imageBitmap).catch(() => null);
+
+        if (result) {
           handleScan(result.getText());
-        }).catch(() => {
+        } else {
           document.getElementById("result").textContent = "Failed to decode image.";
-        });
+        }
       };
       input.click();
     }
@@ -81,7 +86,7 @@
     window.uploadImage = uploadImage;
   </script>
 
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     body {
       margin: 0;
@@ -127,7 +132,7 @@
 </head>
 <body>
   <header>
-    <img src="sgs.png" alt="SGS Logo" height="60">
+    <img src="sgs.png" alt="SGS Logo" height="60" />
     <h1>Luggage Code Scanner</h1>
   </header>
 
