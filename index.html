@@ -1,90 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>SGS Luggage Scanner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script type="module">
-    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.18.6/esm/index.min.js';
-
-    const apiUrl = "https://script.google.com/macros/s/AKfycby9KJbi-0ofT53XZsAOCVAZ3sV8j4hAER6ktUx3J364Kd7gk8BMsHkGbv_qlU1J7PtE/exec";
-    const codeReader = new BrowserMultiFormatReader();
-    let currentDeviceId = null;
-
-    async function switchCamera(mode) {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(d => d.kind === "videoinput");
-
-        if (videoDevices.length === 0) {
-          document.getElementById("result").textContent = "No camera devices found.";
-          return;
-        }
-
-        const selectedDevice = videoDevices.find(d =>
-          d.label.toLowerCase().includes(mode === 'environment' ? 'back' : 'front')
-        ) || videoDevices[0];
-
-        currentDeviceId = selectedDevice.deviceId;
-        codeReader.reset(); // this now works
-
-        codeReader.decodeFromVideoDevice(currentDeviceId, "reader", (result, err) => {
-          if (result) {
-            handleScan(result.getText());
-          }
-        });
-      } catch (error) {
-        document.getElementById("result").textContent = "Camera error: " + error;
-      }
-    }
-
-    function uploadImage() {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function () {
-          const img = new Image();
-          img.onload = function () {
-            codeReader.decodeFromImageElement(img)
-              .then(result => handleScan(result.getText()))
-              .catch(() => {
-                document.getElementById("result").textContent = "Failed to decode image.";
-              });
-          };
-          img.src = reader.result;
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
-    }
-
-    function handleScan(decodedText) {
-      document.getElementById("result").textContent = "Fetching data...";
-      fetch(`${apiUrl}?code=${encodeURIComponent(decodedText)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) {
-            document.getElementById("result").textContent = data.error;
-          } else {
-            document.getElementById("result").textContent =
-              `Destination: ${data.destination}\nOwner: ${data.owner}\nArrival: ${data.arrival}`;
-          }
-        })
-        .catch(() => {
-          document.getElementById("result").textContent = "Error contacting server.";
-        });
-    }
-
-    window.onload = () => switchCamera('environment');
-    window.switchCamera = switchCamera;
-    window.uploadImage = uploadImage;
-  </script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
     body {
       margin: 0;
@@ -130,13 +51,13 @@
 </head>
 <body>
   <header>
-    <img src="sgs.png" alt="SGS Logo" height="60" />
+    <img src="sgs.png" alt="SGS Logo" height="60">
     <h1>Luggage Code Scanner</h1>
   </header>
 
   <div>
-    <button class="btn" onclick="switchCamera('environment')">Back Camera</button>
-    <button class="btn" onclick="switchCamera('user')">Front Camera</button>
+    <button class="btn" onclick="startCamera('environment')">Back Camera</button>
+    <button class="btn" onclick="startCamera('user')">Front Camera</button>
     <button class="btn" onclick="uploadImage()">Upload Image</button>
   </div>
 
@@ -146,5 +67,58 @@
   <footer style="margin-top: auto; padding: 20px; font-size: 14px; color: #666;">
     © 2025 Saudi Ground Services Academy
   </footer>
+
+  <script>
+    const apiUrl = "https://script.google.com/macros/s/AKfycby9KJbi-0ofT53XZsAOCVAZ3sV8j4hAER6ktUx3J364Kd7gk8BMsHkGbv_qlU1J7PtE/exec";
+    let html5QrCode;
+    const config = { fps: 10, qrbox: 250 };
+
+    function handleScan(decodedText) {
+      document.getElementById("result").textContent = "Fetching data...";
+      fetch(`${apiUrl}?code=${encodeURIComponent(decodedText)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            document.getElementById("result").textContent = data.error;
+          } else {
+            document.getElementById("result").textContent =
+              `Destination: ${data.destination}\nOwner: ${data.owner}\nArrival: ${data.arrival}`;
+          }
+        })
+        .catch(() => {
+          document.getElementById("result").textContent = "Error contacting server.";
+        });
+    }
+
+    function startCamera(facingMode = "environment") {
+      const qrRegion = document.getElementById("reader");
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          html5QrCode.start({ facingMode: facingMode }, config, handleScan);
+        });
+      } else {
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start({ facingMode: facingMode }, config, handleScan);
+      }
+    }
+
+    function uploadImage() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const qr = new Html5Qrcode("reader");
+        qr.scanFile(file, true)
+          .then(handleScan)
+          .catch(() => document.getElementById("result").textContent = "Failed to decode image.");
+      };
+      input.click();
+    }
+
+    window.onload = () => startCamera("environment");
+  </script>
 </body>
 </html>
