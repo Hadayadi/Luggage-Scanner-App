@@ -159,7 +159,7 @@
           ctx.drawImage(img, 0, 0, img.width, img.height);
           const imageData = canvas.toDataURL("image/png");
 
-          Html5QrcodeScanner.getCameras().then(() => {
+          Html5Qrcode.getCameras().then(() => {
             const qr = new Html5Qrcode("reader");
             qr.scanFile(file, true)
               .then(qrCodeMessage => {
